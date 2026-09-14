@@ -1,223 +1,82 @@
-from flask import Flask, request, Response
-from twilio.twiml.messaging_response import MessagingResponse
+import os
+from flask import Flask, request, jsonify
 from supabase import create_client, Client
-import unicodedata
-from google import genai
+import google.generativeai as genai
 
 app = Flask(__name__)
 
 # ==========================================
-# 1. CONFIGURACIÓN DE TUS LLAVES Y CONEXIONES
+# 1. CONFIGURACIÓN DE CREDENCIALES
 # ==========================================
+# En Render, es mejor usar Variables de Entorno, pero si prefieres 
+# pegarlas directo por ahora, ponlas entre las comillas.
+SUPABASE_URL = os.environ.get( "https://uctwcciuvgonajsvfhkc.supabase.co")
+SUPABASE_KEY = os.environ.get(""eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjdHdjY2l1dmdvbmFqc3ZmaGtjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDc3ODA0NywiZXhwIjoyMDk2MzU0MDQ3fQ.RLXQTYlwBj3Cj-u76jxVxiOJFfJ5aCp3B3-iBLIeTpk"")
+GEMINI_API_KEY = os.environ.get("AQ.Ab8RN6KuujeAgbB6-ZvER6xzUlz0ErdmSK0N7MbaHssDHW_Ygw")
 
-# Conexión a Supabase
-SUPABASE_URL = "https://uctwcciuvgonajsvfhkc.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjdHdjY2l1dmdvbmFqc3ZmaGtjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDc3ODA0NywiZXhwIjoyMDk2MzU0MDQ3fQ.RLXQTYlwBj3Cj-u76jxVxiOJFfJ5aCp3B3-iBLIeTpk" 
+# Inicializar conexiones
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+genai.configure(api_key=GEMINI_API_KEY)
 
-# Conexión al Cerebro de Inteligencia Artificial (Gemini)
-GOOGLE_API_KEY = "AQ.Ab8RN6KuujeAgbB6-ZvER6xzUlz0ErdmSK0N7MbaHssDHW_Ygw"
-cliente_ia = genai.Client(api_key=GOOGLE_API_KEY)
-
-# ==========================================
-# 2. FUNCIONES DE AYUDA
-# ==========================================
-
-def limpiar_texto(texto):
-    texto_sin_acentos = unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('utf-8')
-    for simbolo in ['?', '!', '.', ',', '"', "'"]:
-        texto_sin_acentos = texto_sin_acentos.replace(simbolo, '')
-    return texto_sin_acentos.strip().lower()
-
-# ==========================================
-# 3. LÓGICA PRINCIPAL DEL BOT (WEBHOOK)
-# ==========================================
+# Configuración del modelo de IA
+modelo = genai.GenerativeModel('gemini-1.5-flash')
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
+    # 2. Leer el mensaje que nos mandará Node.js en formato JSON
+    datos = request.get_json()
+    
+    if not datos:
+        return jsonify({"error": "Formato incorrecto, se esperaba JSON"}), 400
+
+    mensaje_entrante = datos.get('mensaje', '').strip()
+    numero_cliente = datos.get('numero', 'Desconocido')
+
+    # Si el mensaje está vacío, no hacemos nada
+    if not mensaje_entrante:
+        return jsonify({"respuesta": "No pude leer tu mensaje. ¿En qué te ayudo?"})
+
+    print(f"[{numero_cliente}] Pregunta: {mensaje_entrante}")
+
     try:
-        mensaje_crudo = request.values.get('Body', '')
-        numero_remitente = request.values.get('From', '')
-        num_media = int(request.values.get('NumMedia', 0))
-        tipo_mensaje = request.values.get('MessageType', 'text')
+        # 3. Consultar el inventario en Supabase
+        # Asegúrate de que tu tabla se llame 'inventario' (o cámbialo aquí abajo)
+        respuesta_bd = supabase.table('inventario').select('*').execute()
+        datos_inventario = respuesta_bd.data
+
+        # 4. El "Cerebro" de Tapi (Prompt completo)
+        prompt_sistema = f"""
+        Eres Tapi, el asistente virtual experto de Tapitel. 
+        Tu objetivo es dar una excelente atención al cliente, respondiendo dudas sobre nuestro catálogo de materiales para tapicería, como telas, rollos de vinil, dubetina para techos de auto, hule espuma y accesorios (como grapas o pegamento).
         
-        respuesta = MessagingResponse()
-        mensaje = respuesta.message()
-
-        # Bloqueo de notas de voz y stickers
-        if tipo_mensaje != 'text' and num_media == 0:
-            mensaje.body("🤖 Por ahora solo entiendo mensajes de texto o fotos de comprobantes. ¿Me escribes tu consulta?")
-            print(f"--- XML ENVIADO A TWILIO ---\n{str(respuesta)}\n----------------------------")
-            return Response(str(respuesta), mimetype='application/xml')
-
-        mensaje_entrante = limpiar_texto(mensaje_crudo)
+        Reglas:
+        1. Sé amable, claro y directo.
+        2. Usa el inventario proporcionado abajo para saber qué tenemos disponible.
+        3. Si un cliente pide algo que no está en el inventario, dile amablemente que por el momento no contamos con ello.
+        4. No inventes precios ni existencias que no estén en la lista.
         
-        # --- BOTONES DE EMERGENCIA ---
-        if "asesor" in mensaje_entrante:
-            mensaje.body("🤖 Te transferiré con un asesor. Dame un momento.")
-            print(f"--- XML ENVIADO A TWILIO ---\n{str(respuesta)}\n----------------------------")
-            return Response(str(respuesta), mimetype='application/xml')
-            
-        if mensaje_entrante in ["cancelar", "vaciar", "reiniciar", "empezar de nuevo"]:
-            supabase.table("carritos_activos").delete().eq("telefono", numero_remitente).execute()
-            mensaje.body("🗑️ He vaciado tu pedido por completo. ¿Empezamos de cero? Dime qué buscas.")
-            print(f"--- XML ENVIADO A TWILIO ---\n{str(respuesta)}\n----------------------------")
-            return Response(str(respuesta), mimetype='application/xml')
-
-        # --- VALIDACIÓN VIP ---
-        es_vip = False
-        resultado_vip = supabase.table("clientes_vip").select("*").eq("telefono", numero_remitente).execute()
-        if resultado_vip.data:
-            es_vip = True
-
-        # --- GESTIÓN DE LA MEMORIA (CARRITO) ---
-        resultado_carrito = supabase.table("carritos_activos").select("*").eq("telefono", numero_remitente).execute()
-        datos_carrito = resultado_carrito.data
-
-        saludos = ["hola", "buenas", "buenos dias", "buenas tardes", "que tal"]
-
-        if not datos_carrito:
-            supabase.table("carritos_activos").insert({"telefono": numero_remitente, "estado": "cotizando", "articulos": [], "total": 0}).execute()
-            if mensaje_entrante in saludos:
-                mensaje.body("¡Hola! Soy el copiloto de Tapitel. 🤖\n¿Qué material o herramienta buscas hoy?")
-                print(f"--- XML ENVIADO A TWILIO ---\n{str(respuesta)}\n----------------------------")
-                return Response(str(respuesta), mimetype='application/xml')
-            datos_carrito = [{"telefono": numero_remitente, "estado": "cotizando", "articulos": [], "total": 0}]
-
-        carrito = datos_carrito[0]
-        estado_actual = carrito['estado']
+        Inventario actual en bodega:
+        {datos_inventario}
         
-        # ==========================================
-        # ESTADO 1: COTIZANDO Y BUSCANDO
-        # ==========================================
-        if estado_actual == 'cotizando':
-            if mensaje_entrante in saludos:
-                if carrito['total'] > 0:
-                    mensaje.body(f"¡Hola de nuevo! 🤖 Tienes un pedido pendiente por ${carrito['total']}.\n¿Qué más te agrego? O escribe 'listo' para pagar.")
-                else:
-                    mensaje.body("¡Hola de nuevo! 🤖 Dime, ¿qué material buscas hoy?")
-                
-            elif "registrado" in mensaje_entrante or "mayoreo" in mensaje_entrante:
-                msg = "🤖 ¡Claro! Ya te tengo en mi lista VIP. Tus precios tienen descuento automático." if es_vip else "🤖 Aún no tengo este número registrado. Escribe *asesor* para darte de alta."
-                mensaje.body(msg)
-                
-            elif mensaje_entrante in ["comprar", "pagar", "listo", "cerrar", "terminar"]:
-                if carrito['total'] == 0:
-                    mensaje.body("🤖 Tu pedido está vacío. Escribe 'agregar [material]' para empezar.")
-                else:
-                    supabase.table("carritos_activos").update({"estado": "pagando"}).eq("telefono", numero_remitente).execute()
-                    texto_pago = (
-                        f"📝 *Resumen de tu pedido*\nTotal: ${carrito['total']}\n\n"
-                        "Para asegurar tu material, requerimos el pago por transferencia.\n"
-                        "🏦 BBVA | Cuenta: 1234567890 | Tapitel\n\n"
-                        "📸 *Envíame la foto del comprobante por aquí.*\n"
-                        "*(Si pagarás en efectivo en el mostrador, escribe 'efectivo')*"
-                    )
-                    mensaje.body(texto_pago)
-                    
-            elif mensaje_entrante.startswith("agregar"):
-                producto = mensaje_entrante.replace("agregar", "").strip()
-                resultado = supabase.table("inventario_tapitel").select("*").ilike("producto", f"%{producto}%").limit(1).execute()
-                
-                if resultado.data:
-                    item = resultado.data[0]
-                    existencia = item.get("existencia", 0)
-                    precio = item.get("p_mayoreo", item.get("p_venta", 0)) if es_vip else item.get("p_venta", 0)
-                    
-                    if existencia <= 0:
-                        mensaje.body(f"❌ Lo siento, {item['producto']} se encuentra agotado.")
-                    else:
-                        nuevo_total = carrito['total'] + precio
-                        nuevos_articulos = carrito['articulos'] + [item['producto']]
-                        supabase.table("carritos_activos").update({"articulos": nuevos_articulos, "total": nuevo_total}).eq("telefono", numero_remitente).execute()
-                        mensaje.body(f"✅ *Agregado:* {item['producto']} (${precio})\n💰 *Total actual:* ${nuevo_total}\n\nPara cerrar tu pedido escribe *listo*, o busca otro material.")
-                else:
-                    mensaje.body("🤖 No encontré ese producto. Escríbelo exactamente como te lo indiqué en las sugerencias.")
-                    
-            else:
-                # --- AQUÍ ENTRA LA INTELIGENCIA ARTIFICIAL (GEMINI) ---
-                datos_inv = supabase.table("inventario_tapitel").select("producto, p_venta, p_mayoreo, existencia").execute().data
-                
-                catalogo_texto = ""
-                for item in datos_inv:
-                    if item['existencia'] > 0:
-                        precio = item['p_mayoreo'] if es_vip else item['p_venta']
-                        catalogo_texto += f"- {item['producto']} (Precio: ${precio})\n"
-                
-                prompt = f"""Eres el copiloto experto de ventas de Tapitel, una tienda de materiales de tapicería.
-                
-                Este es tu inventario exacto y actualizado de hoy:
-                {catalogo_texto}
-                
-                El cliente te acaba de decir esto: "{mensaje_entrante}"
-                
-                Tus reglas estrictas:
-                1. Analiza lo que pide. Si busca "esponja de 2 pulgadas", revisa el inventario y menciónale las diferentes densidades que tenemos en esa medida.
-                2. Si pide algo que no tenemos exacto, ofrécele la alternativa más lógica que sí tengamos en el inventario.
-                3. NUNCA inventes productos ni precios que no estén en la lista del inventario de hoy.
-                4. Háblale de forma natural, amable y concisa (máximo 3 párrafos cortos). Usa viñetas para listar opciones.
-                5. Al final de tu respuesta, indícale siempre que para confirmar el pedido debe escribir la palabra "agregar" seguida del nombre exacto del producto como aparece en el inventario.
-                """
-                
-                respuesta_gemini = cliente_ia.models.generate_content(
-                    model='gemini-1.5-flash',
-                    contents=prompt,
-                )
-                mensaje.body(respuesta_gemini.text)
+        Mensaje del cliente: "{mensaje_entrante}"
+        
+        Redacta tu respuesta a continuación:
+        """
 
-        # ==========================================
-        # ESTADO 2: PAGANDO
-        # ==========================================
-        elif estado_actual == 'pagando':
-            if num_media > 0 or "efectivo" in mensaje_entrante:
-                supabase.table("carritos_activos").update({"estado": "entrega"}).eq("telefono", numero_remitente).execute()
-                if "efectivo" in mensaje_entrante:
-                    mensaje.body("✅ Anotado: Pago en efectivo al recoger.\n\n¿Deseas envío *a domicilio* o prefieres *recoger* en mostrador?")
-                else:
-                    mensaje.body("✅ Comprobante recibido.\n\n¿Deseas envío *a domicilio* o prefieres *recoger* en mostrador?")
-            else:
-                mensaje.body("🤖 Aún espero tu comprobante (o escribe 'efectivo' si pagarás en mostrador).")
-
-        # ==========================================
-        # ESTADO 3: ENTREGA Y CIERRE
-        # ==========================================
-        elif estado_actual == 'entrega':
-            tipo_entrega = ""
-            if "domicilio" in mensaje_entrante:
-                tipo_entrega = "Domicilio"
-                mensaje.body("🚚 Perfecto. Compártenos tu ubicación o dirección completa por aquí para coordinar la ruta.\n\n¡Gracias por tu compra en Tapitel! 🛠️")
-            elif "recoger" in mensaje_entrante or "mostrador" in mensaje_entrante:
-                tipo_entrega = "Mostrador"
-                mensaje.body("🏪 ¡Perfecto! Tu material quedará separado. Te esperamos a partir de las 12:30 pm.\n\n¡Gracias por tu compra en Tapitel! 🛠️")
-            
-            if tipo_entrega:
-                try:
-                    supabase.table("pedidos_completados").insert({
-                        "telefono": numero_remitente,
-                        "articulos": carrito['articulos'],
-                        "total": carrito['total'],
-                        "entrega": tipo_entrega
-                    }).execute()
-                except Exception as e:
-                    print("Error guardando historial de pedido:", e)
-                    
-                supabase.table("carritos_activos").delete().eq("telefono", numero_remitente).execute()
-            else:
-                mensaje.body("🤖 Por favor, responde únicamente si prefieres envío *a domicilio* o *recoger* en tienda para terminar.")
-
-        # --- IMPRESIÓN DE DEPURACIÓN FINAL ---
-        print(f"--- XML ENVIADO A TWILIO ---\n{str(respuesta)}\n----------------------------")
-        return Response(str(respuesta), mimetype='application/xml')
+        # 5. Mandar a pensar a Gemini
+        respuesta_ia = modelo.generate_content(prompt_sistema)
+        respuesta_final = respuesta_ia.text.strip()
 
     except Exception as e:
-        print(f"Error crítico capturado: {e}")
-        respuesta_emergencia = MessagingResponse()
-        respuesta_emergencia.message("🤖 Tuve un pequeño inconveniente procesando los datos. Escribe *cancelar* para reiniciar el pedido, o *asesor* para ayuda manual.")
-        print(f"--- XML DE EMERGENCIA ENVIADO A TWILIO ---\n{str(respuesta_emergencia)}\n----------------------------")
-        return Response(str(respuesta_emergencia), mimetype='application/xml')
+        print(f"Error interno en el servidor: {e}")
+        respuesta_final = "Una disculpa, estoy revisando el almacén y tuve un pequeño problema técnico. ¿Me puedes repetir tu pregunta?"
 
+    # 6. Devolver la respuesta empaquetada en JSON para que Node.js la mande a WhatsApp
+    return jsonify({
+        "respuesta": respuesta_final
+    })
+
+# Motor de arranque
 if __name__ == '__main__':
-    print("🚀 Copiloto Tapitel con IA activado. Esperando mensajes...")
-    app.run(port=5000, debug=True)
-
-    
+    # Gunicorn en Render ignorará esto, es solo por si haces pruebas locales
+    app.run(host='0.0.0.0', port=5000, debug=True)
