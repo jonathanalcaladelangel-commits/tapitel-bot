@@ -5,19 +5,20 @@ import google.generativeai as genai
 
 app = Flask(__name__)
 
-# ==========================================
 # 1. CONFIGURACIÓN DE CREDENCIALES
 # ==========================================
-# SOLO REEMPLAZA LO QUE ESTÁ DENTRO DE LAS COMILLAS
 SUPABASE_URL = "https://uctwcciuvgonajsvfhkc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjdHdjY2l1dmdvbmFqc3ZmaGtjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDc3ODA0NywiZXhwIjoyMDk2MzU0MDQ3fQ.RLXQTYlwBj3Cj-u76jxVxiOJFfJ5aCp3B3-iBLIeTpk"
-GEMINI_API_KEY ="AQ.Ab8RN6LWvCO5giXroJMHmS7QQlJvVr95AAwIMpwVTr30hSQjoQ"
+GEMINI_API_KEY = "AQ.Ab8RN6LWvCO5giXroJMHmS7QQIJvVr95AAwIMpwVTr30hSQjoQ" # (Asegúrate de ponerla completa)
+
+# Forzar la llave en el sistema operativo del servidor
+os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
 
 # Inicializar conexión a la base de datos
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Inicializar el cerebro de Inteligencia Artificial
-genai.configure(api_key=AQ."Ab8RN6LWvCO5giXroJMHmS7QQlJvVr95AAwIMpwVTr30hSQjoQ")
+# Inicializar IA forzando el método de conexión 'rest' para evitar el bug de las llaves AQ
+genai.configure(api_key=GEMINI_API_KEY, transport='rest')
 modelo = genai.GenerativeModel('gemini-1.5-flash')
 
 @app.route('/webhook', methods=['POST'])
