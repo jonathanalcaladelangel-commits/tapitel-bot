@@ -1,5 +1,0 @@
-Flask
-twilio
-supabase
-google-genai
-gunicorn
