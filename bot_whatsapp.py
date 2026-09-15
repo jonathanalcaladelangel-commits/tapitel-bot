@@ -41,7 +41,7 @@ def webhook():
     try:
         # 3. Consultar el inventario en Supabase
         # Asegúrate de que tu tabla se llame 'inventario' (o cámbialo aquí abajo)
-        respuesta_bd = supabase.table('inventario').select('*').execute()
+        respuesta_bd = supabase.table('inventario_tapitel').select('*').execute()
         datos_inventario = respuesta_bd.data
 
         # 4. El "Cerebro" de Tapi (Prompt completo)
