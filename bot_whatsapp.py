@@ -12,7 +12,7 @@ app = Flask(__name__)
 # pegarlas directo por ahora, ponlas entre las comillas.
 SUPABASE_URL = ( "https://uctwcciuvgonajsvfhkc.supabase.co")
 SUPABASE_KEY = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjdHdjY2l1dmdvbmFqc3ZmaGtjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDc3ODA0NywiZXhwIjoyMDk2MzU0MDQ3fQ.RLXQTYlwBj3Cj-u76jxVxiOJFfJ5aCp3B3-iBLIeTpk")
-GEMINI_API_KEY = ("AQ.Ab8RN6KuujeAgbB6-ZvER6xzUlz0ErdmSK0N7MbaHssDHW_Ygw")
+GEMINI_API_KEY = ("AQ.Ab8RN6Kc6sW_0u00TYw5GpMfvM4t0v6pKv6YH9Y07CmM3E981g")
 
 # Inicializar conexiones
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
