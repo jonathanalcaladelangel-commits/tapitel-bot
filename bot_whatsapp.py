@@ -11,7 +11,7 @@ app = Flask(__name__)
 # En Render, es mejor usar Variables de Entorno, pero si prefieres 
 # pegarlas directo por ahora, ponlas entre las comillas.
 SUPABASE_URL = os.environ.get( "https://uctwcciuvgonajsvfhkc.supabase.co")
-SUPABASE_KEY = os.environ.get("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjdHdjY2l1dmdvbmFqc3ZmaGtjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDc3ODA0NywiZXhwIjoyMDk2MzU0MDQ3fQ.RLXQTYlwBj3Cj-u76jxVxiOJFfJ5aCp3B3-iBLIeTpk"")
+SUPABASE_KEY = os.environ.get("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjdHdjY2l1dmdvbmFqc3ZmaGtjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDc3ODA0NywiZXhwIjoyMDk2MzU0MDQ3fQ.RLXQTYlwBj3Cj-u76jxVxiOJFfJ5aCp3B3-iBLIeTpk")
 GEMINI_API_KEY = os.environ.get("AQ.Ab8RN6KuujeAgbB6-ZvER6xzUlz0ErdmSK0N7MbaHssDHW_Ygw")
 
 # Inicializar conexiones
