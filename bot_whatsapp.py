@@ -52,15 +52,15 @@ def webhook():
         
         Redacta tu respuesta a continuación:
         """
-
-        # ==========================================
+# ==========================================
         # 2. CONEXIÓN DIRECTA A GEMINI (Bypass de la librería)
         # ==========================================
-        url_gemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        # AQUÍ ESTÁ EL CAMBIO: Le inyectamos tu llave directamente a la URL con ?key=
+        url_gemini = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         
+        # Dejamos los encabezados limpios
         encabezados = {
-            "Content-Type": "application/json",
-            "x-goog-api-key": GEMINI_API_KEY
+            "Content-Type": "application/json"
         }
         
         cuerpo_peticion = {
@@ -71,20 +71,5 @@ def webhook():
 
         # Enviar el inventario y la pregunta a Google
         respuesta_google = requests.post(url_gemini, headers=encabezados, json=cuerpo_peticion)
+
         
-        if respuesta_google.status_code == 200:
-            datos_ia = respuesta_google.json()
-            # Extraer la redacción limpia de Tapi
-            respuesta_final = datos_ia["candidates"][0]["content"]["parts"][0]["text"].strip()
-        else:
-            print(f"Error de Google: {respuesta_google.text}", flush=True)
-            respuesta_final = "Una disculpa, estoy revisando el almacén y tuve un pequeño problema técnico."
-
-    except Exception as e:
-        print(f"Error interno en el servidor: {e}", flush=True)
-        respuesta_final = "Una disculpa, estoy revisando el almacén y tuve un pequeño problema técnico."
-
-    return jsonify({"respuesta": respuesta_final})
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
