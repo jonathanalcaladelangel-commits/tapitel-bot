@@ -1,29 +1,25 @@
 import os
 from flask import Flask, request, jsonify
 from supabase import create_client, Client
-import google.generativeai as genai
+from google import genai # <--- ¡Librería nueva!
 
 app = Flask(__name__)
 
+# ==========================================
 # 1. CONFIGURACIÓN DE CREDENCIALES
 # ==========================================
-SUPABASE_URL = "https://uctwcciuvgonajsvfhkc.supabase.co"
+SUPABASE_URL = "https://uctwcciuvgonajsvfhkc.supabase.co"  
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjdHdjY2l1dmdvbmFqc3ZmaGtjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDc3ODA0NywiZXhwIjoyMDk2MzU0MDQ3fQ.RLXQTYlwBj3Cj-u76jxVxiOJFfJ5aCp3B3-iBLIeTpk"
-GEMINI_API_KEY = "AQ.Ab8RN6LWvCO5giXroJMHmS7QQIJvVr95AAwIMpwVTr30hSQjoQ" # (Asegúrate de ponerla completa)
-
-# Forzar la llave en el sistema operativo del servidor
-os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
+GEMINI_API_KEY = "AQ.Ab8RN6LWvCO5giXroJMHmS7QQIJvVr95AAwIMpwVTr30hSQjoQ"
 
 # Inicializar conexión a la base de datos
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Inicializar IA forzando el método de conexión 'rest' para evitar el bug de las llaves AQ
-genai.configure(api_key=GEMINI_API_KEY, transport='rest')
-modelo = genai.GenerativeModel('gemini-1.5-flash')
+# Inicializar IA con el nuevo cliente oficial
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    # Leer el mensaje que nos manda Node.js
     datos = request.get_json()
     
     if not datos:
@@ -35,17 +31,17 @@ def webhook():
     if not mensaje_entrante:
         return jsonify({"respuesta": "No pude leer tu mensaje. ¿En qué te ayudo?"})
 
-    print(f"[{numero_cliente}] Pregunta: {mensaje_entrante}")
+    # flush=True hace que el texto aparezca de inmediato en los logs de Render
+    print(f"[{numero_cliente}] Pregunta: {mensaje_entrante}", flush=True)
 
     try:
-        # Consultar el inventario de Tapitel en Supabase
+        # Consultar el inventario de Tapitel
         respuesta_bd = supabase.table('inventario_tapitel').select('*').execute()
         datos_inventario = respuesta_bd.data
 
-        # El "Cerebro" de Tapi
         prompt_sistema = f"""
         Eres Tapi, el asistente virtual experto de Tapitel. 
-        Tu objetivo es dar una excelente atención al cliente, respondiendo dudas sobre nuestro catálogo de materiales para tapicería, como telas, rollos de vinil, dubetina para techos de auto, hule espuma y accesorios.
+        Tu objetivo es dar una excelente atención al cliente, respondiendo dudas sobre nuestro catálogo de materiales para tapicería.
         
         Reglas:
         1. Sé amable, claro y directo.
@@ -61,18 +57,18 @@ def webhook():
         Redacta tu respuesta a continuación:
         """
 
-        # Mandar a pensar a Gemini
-        respuesta_ia = modelo.generate_content(prompt_sistema)
+        # Generar respuesta con la nueva sintaxis
+        respuesta_ia = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt_sistema
+        )
         respuesta_final = respuesta_ia.text.strip()
 
     except Exception as e:
-        print(f"Error interno en el servidor: {e}")
+        print(f"Error interno en el servidor: {e}", flush=True)
         respuesta_final = "Una disculpa, estoy revisando el almacén y tuve un pequeño problema técnico. ¿Me puedes repetir tu pregunta?"
 
-    # Devolver la respuesta a Node.js
-    return jsonify({
-        "respuesta": respuesta_final
-    })
+    return jsonify({"respuesta": respuesta_final})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
