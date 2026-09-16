@@ -52,7 +52,7 @@ def webhook():
         
         Redacta tu respuesta a continuación:
         """
-# ==========================================
+        # ==========================================
         # 2. CONEXIÓN DIRECTA A GEMINI (Bypass de la librería)
         # ==========================================
         # AQUÍ ESTÁ EL CAMBIO: Le inyectamos tu llave directamente a la URL con ?key=
