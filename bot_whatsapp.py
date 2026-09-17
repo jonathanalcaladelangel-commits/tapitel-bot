@@ -57,7 +57,10 @@ def webhook():
        
         # 2. CONEXIÓN DIRECTA (LA RUTA QUE SÍ FUNCIONA)
         # ==========================================
-        url_gemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+      # ==========================================
+        # 2. CONEXIÓN DIRECTA (MODELO PRO ESTABLE)
+        # ==========================================
+        url_gemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
         
         encabezados = {
             "Content-Type": "application/json",
