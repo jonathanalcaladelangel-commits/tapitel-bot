@@ -8,10 +8,10 @@ app = Flask(__name__)
 # ==========================================
 # 1. CONFIGURACIÓN SEGURA DE CREDENCIALES
 # ==========================================
-# Ahora las llaves se jalan desde el panel de Render, no están expuestas.
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# El .strip() evita errores si se copian espacios invisibles en Render
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -31,6 +31,7 @@ def webhook():
     print(f"[{numero_cliente}] Pregunta: {mensaje_entrante}", flush=True)
 
     try:
+        # Consultar inventario
         respuesta_bd = supabase.table('inventario_tapitel').select('*').execute()
         datos_inventario = respuesta_bd.data
 
@@ -53,11 +54,10 @@ def webhook():
         """
 
         # ==========================================
-        # 2. CONEXIÓN DIRECTA Y CORRECTA A GEMINI
+        # 2. CONEXIÓN DIRECTA (Corregido a 1.5-flash)
         # ==========================================
-        url_gemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
+        url_gemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
         
-        # La llave AQ. viaja de forma segura en los encabezados
         encabezados = {
             "Content-Type": "application/json",
             "x-goog-api-key": GEMINI_API_KEY
