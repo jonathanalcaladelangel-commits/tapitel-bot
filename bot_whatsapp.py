@@ -54,10 +54,11 @@ def webhook():
         """
 
     
-        # 2. CONEXIÓN DIRECTA (VERSIÓN OFICIAL V1)
+       
+        # 2. CONEXIÓN DIRECTA (LA RUTA QUE SÍ FUNCIONA)
         # ==========================================
-        url_gemini = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent"
-
+        url_gemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        
         encabezados = {
             "Content-Type": "application/json",
             "x-goog-api-key": GEMINI_API_KEY
