@@ -57,7 +57,7 @@ def webhook():
         # 2. CONEXIÓN DIRECTA (Corregido a 1.5-flash)
         # ==========================================
         # Agregamos "-latest" al nombre del modelo
-url_gemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
+        url_gemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
 
         encabezados = {
             "Content-Type": "application/json",
