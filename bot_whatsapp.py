@@ -53,43 +53,38 @@ def webhook():
         Redacta tu respuesta a continuación:
         """
 
-    
-       
-        # 2. CONEXIÓN DIRECTA (LA RUTA QUE SÍ FUNCIONA)
+     # ==========================================
+        # 2. CONEXIÓN ESTABLE (VÍA OPENAI BRIDGE)
         # ==========================================
-      # ==========================================
-        # 2. CONEXIÓN DIRECTA (MODELO PRO ESTABLE)
-        # ==========================================
-        url_gemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent"
+        url_gemini = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
         
         encabezados = {
             "Content-Type": "application/json",
-            "x-goog-api-key": GEMINI_API_KEY
+            "Authorization": f"Bearer {GEMINI_API_KEY}"
         }
         
         cuerpo_peticion = {
-            "contents": [{"parts": [{"text": prompt_sistema}]}]
+            "model": "gemini-1.5-flash",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt_sistema
+                }
+            ]
         }
 
+        # Aumentamos el timeout aquí también a 120 segundos
         respuesta_google = requests.post(
             url_gemini,
             headers=encabezados,
             json=cuerpo_peticion,
-            timeout=30
+            timeout=120
         )
         
         if respuesta_google.status_code == 200:
             datos_ia = respuesta_google.json()
-            respuesta_final = datos_ia["candidates"][0]["content"]["parts"][0]["text"].strip()
+            # La forma de leer la respuesta en este puente es diferente
+            respuesta_final = datos_ia["choices"][0]["message"]["content"].strip()
         else:
             print(f"Error de Google {respuesta_google.status_code}: {respuesta_google.text}", flush=True)
             respuesta_final = "Una disculpa, estoy revisando el almacén y tuve un pequeño problema técnico."
-
-    except Exception as e:
-        print(f"Error interno en el servidor: {e}", flush=True)
-        respuesta_final = "Una disculpa, estoy revisando el almacén y tuve un pequeño problema técnico."
-
-    return jsonify({"respuesta": respuesta_final})
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
